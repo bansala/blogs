@@ -20,11 +20,299 @@
 
     <section class="main-content">
       <h1>
-<a id="musing-of-a-big-data-scientist" class="anchor" href="#musing-of-a-big-data-scientist" aria-hidden="true"><span class="octicon octicon-link"></span></a>Musing of a Big Data Scientist</h1>
+<a id="feature-engineering-with-dates---part-1" class="anchor" href="#feature-engineering-with-dates---part-1" aria-hidden="true"><span class="octicon octicon-link"></span></a>Feature Engineering with Dates - Part 1</h1>
 
-<p>After trying out Medium and LinkedIn to publish articles, this is my latest experiment. I couldn't find a good way to publish my code based, Markdown written articles on those sites. So, here we are!</p>
+<blockquote>
+<p><em><strong>Feature engineering is often the most important part…</strong></em></p>
+</blockquote>
 
-<p>The first set of articles are on feature engineering. The first <a href="#">post</a> starts with extracting features from a simple date time column.</p>
+<p>is what research on winning Kaggle’rs by <a href="http://blog.kaggle.com/2014/08/01/learning-from-the-best/">David Wind reveals</a>. It is somewhat ignored in the texts about machine learning, which seem to focus more on the algorithms, rather than what is being fed into these algorithms. What is feature engineering then?</p>
+
+<blockquote>
+<p><em><strong>Feature engineering is the process of transforming raw data into features that better represent the underlying problem to the predictive models, resulting in improved model accuracy on unseen data.</strong></em> <sup><a href="#footnote1">1</a></sup></p>
+</blockquote>
+
+<p>The focus of this article will be on a simple date/time stamp field and see what features could be extracted from this one field. </p>
+
+<h2>
+<a id="data" class="anchor" href="#data" aria-hidden="true"><span class="octicon octicon-link"></span></a>Data</h2>
+
+<p>To illustrate what is possible, we will consider a simple transaction data set, one possibly generated from retail purchases. Let’s say that we have simple transaction table, with a column identifying the customer, a column indicating the product that was purchased, a column for price and column containing the date and time the purchase was made. Lets say this data is available in a CSV. A file could look like this:</p>
+
+<table>
+<thead>
+<tr>
+<th>customer id</th>
+<th>product id</th>
+<th>price</th>
+<th>date time stamp</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>5</td>
+<td>5.99</td>
+<td>2015–09–11 11:23</td>
+</tr>
+<tr>
+<td>1</td>
+<td>3</td>
+<td>2.99</td>
+<td>2015–01–12 17:50</td>
+</tr>
+</tbody>
+</table>
+
+<p>You could obtain such a data set from <a href="https://www.kaggle.com/c/acquire-valued-shoppers-challenge/data">Kaggle’s Acquire Valued Shopper Challenge</a>. Look for the transactions data. Note that in this data set, there is no price. </p>
+
+<p>For this example, we will be using the <a href="http://www.bigdatalab.ac.cn/benchmark/bm/dd?data=Ta-Feng">Fa-Teng data set</a>. There are a number of other data sets for grocery/retail in <a href="http://recsyswiki.com/wiki/Grocery_shopping_datasets">Recsys</a>.</p>
+
+<blockquote>
+<p><em>Side Note</em>: For a lot of the analysis and code, I will be using Python. I use the <a href="https://nwhitehead.github.io/pineapple/">Pineapple/Jupyter</a> IPython notebook. </p>
+</blockquote>
+
+<h2>
+<a id="round-1-basic-features" class="anchor" href="#round-1-basic-features" aria-hidden="true"><span class="octicon octicon-link"></span></a>Round 1: Basic Features</h2>
+
+<p>When we look at a date time stamp, a number of features, or pieces of information are immediately obvious:</p>
+
+<ul>
+<li>Year</li>
+<li>Month</li>
+<li>Day</li>
+<li>Day of week</li>
+<li>Week of year</li>
+<li>Hour of day</li>
+</ul>
+
+<p>Month and day of week can be quite useful in understanding periodicity or seasonality of transactions. We may find that some actions are more probable on certain days of the week, or somethings happen around the same month every year. With <a href="https://en.wikipedia.org/wiki/Halloween">Halloween</a> around the corner for example, you are probably shopping for candy right now. </p>
+
+<p>Using <code>pandas</code> we try and load this data set (you may have to remove the header row from the file):</p>
+
+<pre><code>
+columns = ['date', 'customer', 'age', 'zipcode', 'product_class', 'product_id', 'amount', 'asset', 'price']
+
+txs = pd.read_table('D11-02/D01', sep=';', header=None, names=columns)
+txs.info()  # to get summary statistics
+txs.head()  # to get a feel for the data
+
+</code></pre>
+
+<div>
+<table border="1">
+  <thead>
+    <tr>
+      <th></th>
+      <th>date</th>
+      <th>customer</th>
+      <th>age</th>
+      <th>zipcode</th>
+      <th>product_class</th>
+      <th>product_id</th>
+      <th>amount</th>
+      <th>asset</th>
+      <th>price</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>2001-01-01 00:00:00</td>
+      <td>141833</td>
+      <td>F</td>
+      <td>F</td>
+      <td>130207</td>
+      <td>4710105011011</td>
+      <td>2</td>
+      <td>44</td>
+      <td>52</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>2001-01-01 00:00:00</td>
+      <td>1376753</td>
+      <td>E</td>
+      <td>E</td>
+      <td>110217</td>
+      <td>4710265849066</td>
+      <td>1</td>
+      <td>150</td>
+      <td>129</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>2001-01-01 00:00:00</td>
+      <td>1603071</td>
+      <td>E</td>
+      <td>G</td>
+      <td>100201</td>
+      <td>4712019100607</td>
+      <td>1</td>
+      <td>35</td>
+      <td>39</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>2001-01-01 00:00:00</td>
+      <td>1738667</td>
+      <td>E</td>
+      <td>F</td>
+      <td>530105</td>
+      <td>4710168702901</td>
+      <td>1</td>
+      <td>94</td>
+      <td>119</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>2001-01-01 00:00:00</td>
+      <td>2141497</td>
+      <td>A</td>
+      <td>B</td>
+      <td>320407</td>
+      <td>4710431339148</td>
+      <td>1</td>
+      <td>100</td>
+      <td>159</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>Unfortunately, the time stamps in this dataset are useless. I couldn't find a realistic data set which has time stamp information. Welcome to the real world, with imperfect data! However, if you know of a good data set, I would love to hear from you!</p>
+
+<p>For the purpose of our feature engineering, lets just imagine that time stamps are available. Now, lets start adding our first set of features to this data set.</p>
+
+<pre><code>from datetime import datetime
+
+year = lambda x: datetime.strptime(x, "%Y-%m-%d %H:%M:%S" ).year
+txs['year'] = txs['date'].map(year)
+txs.head()
+
+</code></pre>
+
+<div>
+<table border="1">
+  <thead>
+    <tr>
+      <th></th>
+      <th>date</th>
+      <th>customer</th>
+      <th>age</th>
+      <th>zipcode</th>
+      <th>product_class</th>
+      <th>product_id</th>
+      <th>amount</th>
+      <th>asset</th>
+      <th>price</th>
+      <th>year</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>2001-01-01 00:00:00</td>
+      <td>141833</td>
+      <td>F</td>
+      <td>F</td>
+      <td>130207</td>
+      <td>4710105011011</td>
+      <td>2</td>
+      <td>44</td>
+      <td>52</td>
+      <td>2001</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>2001-01-01 00:00:00</td>
+      <td>1376753</td>
+      <td>E</td>
+      <td>E</td>
+      <td>110217</td>
+      <td>4710265849066</td>
+      <td>1</td>
+      <td>150</td>
+      <td>129</td>
+      <td>2001</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>2001-01-01 00:00:00</td>
+      <td>1603071</td>
+      <td>E</td>
+      <td>G</td>
+      <td>100201</td>
+      <td>4712019100607</td>
+      <td>1</td>
+      <td>35</td>
+      <td>39</td>
+      <td>2001</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>2001-01-01 00:00:00</td>
+      <td>1738667</td>
+      <td>E</td>
+      <td>F</td>
+      <td>530105</td>
+      <td>4710168702901</td>
+      <td>1</td>
+      <td>94</td>
+      <td>119</td>
+      <td>2001</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>2001-01-01 00:00:00</td>
+      <td>2141497</td>
+      <td>A</td>
+      <td>B</td>
+      <td>320407</td>
+      <td>4710431339148</td>
+      <td>1</td>
+      <td>100</td>
+      <td>159</td>
+      <td>2001</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>You can see here that the feature was added to the <code>DataFrame</code>.
+Here are some other map functions you could use:</p>
+
+<pre><code>day_of_week = lambda x: datetime.strptime(x, "%Y-%m-%d %H:%M:%S" ).weekday()
+month = lambda x: datetime.strptime(x, "%Y-%m-%d %H:%M:%S" ).month
+# please read docs on how week numbers are calculate
+week_number = lambda x: datetime.strptime(x, "%Y-%m-%d %H:%M:%S" ).strftime('%V')
+</code></pre>
+
+<p>You can try writing some of the other features we mentioned above yourself. See, with such simple code, we just added 7 new features!</p>
+
+<h2>
+<a id="round-2-more-interesting-features" class="anchor" href="#round-2-more-interesting-features" aria-hidden="true"><span class="octicon octicon-link"></span></a>Round 2: More Interesting Features</h2>
+
+<p>Now, lets think of more interesting features that may involve looks. How about seasons, or times of days? Here are some example maps that you could run:</p>
+
+<pre><code>seasons = [0,0,1,1,1,2,2,2,3,3,3,0]  #dec - feb is winter, then spring, summer, fall etc
+season = lambda x: seasons[(datetime.strptime(x, "%Y-%m-%d %H:%M:%S" ).month-1)]
+
+# sleep: 12-5, 6-9: breakfast, 10-14: lunch, 14-17: dinner prep, 17-21: dinner, 21-23: deserts!
+times_of_day = [0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5 ]
+time_of_day = lambda x: times_of_day[datetime.strptime(x, "%Y-%m-%d %H:%M:%S").hour]
+</code></pre>
+
+<p>I was working for a client that had a ton of recipes on their site. One of the questions they asked was about a content recommender and what is the right time to display what type of recipe. We used this time of day map to understand when people see breakfast recipe, kids lunch box recipes, appetizers etc. Intuitively, you can imagine that people prepare for next day's lunch and breakfast around or after dinner, especially if you have children. If you coming to the end of your work day, you are probably thinking about dinner and what you could pick up on you way home. This feature was extracted from clickstream to enrich the data and give additional insight in to what types of recipes to show at what time. Season was also a good predictor to understand which recipes are timeless and which are more seasonal. For another grocery client, we saw huge uptick in browsing flyers between 8 and 10 am and noon to 1pm (lunch hour) during week days. Further, Wednesday and Thursdays were heaviest traffic days of the week as most people planned for grocery shopping just before the weekend.</p>
+
+<h2>
+<a id="the-next-part" class="anchor" href="#the-next-part" aria-hidden="true"><span class="octicon octicon-link"></span></a>The Next Part</h2>
+
+<p>So far, we have added 9 features from one date time column. This is by no means an exhaustive list, nor are we done. There are some interesting features that are still waiting to be teased out. In the next article in this series, I will cover extracting more features by merging external data like integrating weather or public holiday data, and maybe do a little bit of calculus! </p>
+
+<p>In the meanwhile, try these out, and let me know how these work for you!</p>
+
+<p><a name="footnote1">1</a>: <a href="http://machinelearningmastery.com/discover-feature-engineering-how-to-engineer-features-and-how-to-get-good-at-it/">http://machinelearningmastery.com/discover-feature-engineering-how-to-engineer-features-and-how-to-get-good-at-it/</a></p>
 
       <footer class="site-footer">
         <span class="site-footer-owner"><a href="https://github.com/bansala/blogs">Musings of big data scientist...</a> is maintained by <a href="https://github.com/bansala">bansala</a>.</span>
