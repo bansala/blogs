@@ -28,6 +28,7 @@ When we look at a date time stamp, a number of features, or pieces of informatio
 * Year
 * Month
 * Day
+* Weekeday or weekend
 * Day of week
 * Week of year
 * Hour of day
